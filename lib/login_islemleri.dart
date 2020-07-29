@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginIslemleri extends StatefulWidget {
   @override
@@ -8,6 +9,7 @@ class LoginIslemleri extends StatefulWidget {
 
 class _LoginIslemleriState extends State<LoginIslemleri> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleAuth = GoogleSignIn();
   String mesaj = "";
 
   @override
@@ -40,7 +42,7 @@ class _LoginIslemleriState extends State<LoginIslemleri> {
                 style: TextStyle(color: Colors.white),
               ),
               color: Colors.lightBlueAccent,
-              onPressed: _emailveSifreLogin,
+              onPressed: _emailveSifreileUserOlustur,
             ),
             RaisedButton(
               child: Text(
@@ -81,41 +83,61 @@ class _LoginIslemleriState extends State<LoginIslemleri> {
               ),
               color: Colors.lightBlueAccent,
               onPressed: _emailGuncelle,
-            )
-
+            ),
+            RaisedButton(
+              child: Text(
+                "Google ile Giriş Yap",
+                style: TextStyle(color: Colors.white),
+              ),
+              color: Colors.lightBlueAccent,
+              onPressed: _googleGiris,
+            ),
+            RaisedButton(
+              child: Text(
+                "TelNo ile Giriş Yap",
+                style: TextStyle(color: Colors.white),
+              ),
+              color: Colors.lightBlueAccent,
+              onPressed: _telNoGiris,
+            ),
+            Text(mesaj),
           ],
         ),
       ),
     );
   }
 
-  _emailveSifreLogin() async {
+  void _emailveSifreileUserOlustur() async {
     String mail = "ciktieposta@mail.com.tr";
-    String sifre = "12345678";
+    String sifre = "123456";
     var authResult = await _auth
-        .createUserWithEmailAndPassword(email: mail, password: sifre)
-        .catchError((e) => debugPrint("Hata: " + e.toString()));
+        .createUserWithEmailAndPassword(
+          email: mail,
+          password: sifre,
+        )
+        .catchError((e) => debugPrint("Hata :" + e.toString()));
     var firebaseUser = authResult.user;
     if (firebaseUser != null) {
       firebaseUser.sendEmailVerification().then((data) {
         _auth.signOut();
-      }).catchError((e) => debugPrint("Mail Gönderirken hata oluştu $e"));
+      }).catchError((e) => debugPrint("Mail gönderirken hata $e"));
+
       setState(() {
         mesaj =
-            "Uid: ${firebaseUser.uid} \n mail: ${firebaseUser.email} \n mailOnaylıMı: ${firebaseUser.isEmailVerified}\n Email Gönderildi Lütfen Onaylayın";
+            "Uid ${firebaseUser.uid} \nmail : ${firebaseUser.email} \nmailOnayı : ${firebaseUser.isEmailVerified}\n Email gönderildi lütfen onaylayın";
       });
       debugPrint(
-          "Uid: ${firebaseUser.uid} mail: ${firebaseUser.email} mailOnaylıMı: ${firebaseUser.isEmailVerified}");
+          "Uid ${firebaseUser.uid} mail : ${firebaseUser.email} mailOnayı : ${firebaseUser.isEmailVerified} ");
     } else {
       setState(() {
-        mesaj = "firebase user null";
+        mesaj = "bu mail zaten kullanımda";
       });
     }
   }
 
   void _emailveSifreileGirisYap() {
     String mail = "ciktieposta@mail.com.tr";
-    String sifre = "12345678";
+    String sifre = "123456";
 
     _auth
         .signInWithEmailAndPassword(email: mail, password: sifre)
@@ -140,29 +162,31 @@ class _LoginIslemleriState extends State<LoginIslemleri> {
   void _cikisYap() async {
     if (await _auth.currentUser() != null) {
       _auth.signOut().then((data) {
+        _googleAuth.signOut();
         setState(() {
-          mesaj = "kullanıcı çıkıs yaptı";
+          mesaj += "\nKullanıcı çıkış yaptı";
         });
       }).catchError((hata) {
         setState(() {
-          mesaj = "Cıkış yaparken hata oluştu";
+          mesaj += "\nÇıkış yaparken hata oluştu $hata";
         });
       });
     } else {
       setState(() {
-        mesaj = "Oturum Açmış Kullanıcı Yok";
+        mesaj += "\nOturum açmış kullanıcı yok";
       });
     }
   }
 
   void _sifremiUnuttum() {
     String mail = "ciktieposta@mail.com.tr";
-    _auth
-        .sendPasswordResetEmail(email: mail)
-        .then((value) {})
-        .catchError((hata) {
+    _auth.sendPasswordResetEmail(email: mail).then((v) {
       setState(() {
-        mesaj = "Bir Hata Oluştu";
+        mesaj += "\nSıfırlama maili gönderildi";
+      });
+    }).catchError((hata) {
+      setState(() {
+        mesaj += "\nŞifremi unuttum mailinde hata $hata";
       });
     });
   }
@@ -170,20 +194,24 @@ class _LoginIslemleriState extends State<LoginIslemleri> {
   void _sifremiGuncelle() async {
     _auth.currentUser().then((user) {
       if (user != null) {
-        user.updatePassword("123456789").then((a) {
+        user.updatePassword("234567").then((a) {
           setState(() {
-            mesaj += "\n Şifre Güncellendi";
+            mesaj += "\nŞifre güncellendi";
           });
         }).catchError((hata) {
           setState(() {
-            mesaj += "\n Şifre Güncellerken Hata Oluştu";
+            mesaj += "\nŞifre güncellenirken hata olustur $hata";
           });
         });
-      }else{
+      } else {
         setState(() {
-          mesaj+="\n Şifre Güncellemek İçin Önce Oturum Açın";
+          mesaj += "\nŞifre güncellemek için önce oturum açın";
         });
       }
+    }).catchError((hata) {
+      setState(() {
+        mesaj += "\nKullanıcı getirilirken cıkan hata : $hata";
+      });
     });
   }
 
@@ -192,18 +220,89 @@ class _LoginIslemleriState extends State<LoginIslemleri> {
       if (user != null) {
         user.updateEmail("mehmet@mehmet.com").then((a) {
           setState(() {
-            mesaj += "\n Email Güncellendi";
+            mesaj += "\Email güncellendi";
           });
         }).catchError((hata) {
           setState(() {
-            mesaj += "\n Email Güncellerken Hata Oluştu";
+            mesaj += "\Email güncellenirken hata olustur $hata";
           });
         });
-      }else{
+      } else {
         setState(() {
-          mesaj+="\n Email Güncellemek İçin Önce Oturum Açın";
+          mesaj += "\Email güncellemek için önce oturum açın";
         });
       }
+    }).catchError((hata) {
+      setState(() {
+        mesaj += "\nKullanıcı getirilirken cıkan hata : $hata";
+      });
     });
+  }
+
+  void _googleGiris() {
+    _googleAuth.signIn().then((sonuc) {
+      sonuc.authentication.then((googleKeys) {
+        AuthCredential credential = GoogleAuthProvider.getCredential(
+            idToken: googleKeys.idToken, accessToken: googleKeys.accessToken);
+        _auth.signInWithCredential(credential).then((user) {
+          setState(() {
+            mesaj += "\nGmail ile giriş yapıldı";
+          });
+        }).catchError((hata) {
+          setState(() {
+            mesaj += "\nFirebase hatası";
+          });
+        });
+      }).catchError((hata) {
+        setState(() {
+          mesaj += "\nGoogle auth hatası";
+        });
+      });
+    }).catchError((hata) {
+      setState(() {
+        mesaj += "\nGoogle ile giriş yaparken hata oluştu";
+      });
+    });
+  }
+
+  void _telNoGiris() {
+    String mail = "ciktieposta@mail.com.tr";
+    String sifre = "123456";
+
+    _auth.verifyPhoneNumber(
+        phoneNumber: "+905555555555",
+        timeout: Duration(seconds: 60),
+        verificationCompleted: (AuthCredential credential) {
+          _auth.signInWithCredential(credential).then((userAuthResult) {
+            var user = userAuthResult.user;
+            user.updateEmail(mail).then((aaa) {
+              user.updatePassword(sifre).then((aaa) {
+                debugPrint("Verification tamamlandı user: $user");
+              });
+            });
+          });
+        },
+        verificationFailed: (AuthException exception) {
+          debugPrint("Authexception ${exception.message}");
+        },
+        codeSent: (String verificationId, [int forceResendingToken]) {
+          debugPrint("verification id: $verificationId");
+          debugPrint("forceresending token: $forceResendingToken");
+
+          AuthCredential credential = PhoneAuthProvider.getCredential(
+              verificationId: verificationId, smsCode: "123456");
+          _auth.signInWithCredential(credential).then((userAuthResult) {
+            var user = userAuthResult.user;
+
+            user.updateEmail(mail).then((aaa) {
+              user.updatePassword(sifre).then((aaa) {
+                debugPrint("Verification tamamlandı user: $user");
+              });
+            });
+          });
+        },
+        codeAutoRetrievalTimeout: (String verificationID) {
+          debugPrint("time out verification id: $verificationID");
+        });
   }
 }
